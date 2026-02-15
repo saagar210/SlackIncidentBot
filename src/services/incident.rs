@@ -79,6 +79,10 @@ impl IncidentService {
         incident_queries::update_channel_id(&self.pool, incident_id, channel_id).await
     }
 
+    pub async fn delete_incident(&self, incident_id: IncidentId) -> IncidentResult<()> {
+        incident_queries::delete_incident(&self.pool, incident_id).await
+    }
+
     pub async fn post_status_update(
         &self,
         incident_id: IncidentId,

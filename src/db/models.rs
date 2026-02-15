@@ -149,6 +149,20 @@ pub struct NotificationRecord {
     pub error_message: Option<String>,
 }
 
+// ── Incident Template ──
+#[derive(Debug, Clone, FromRow, Serialize)]
+pub struct IncidentTemplate {
+    pub id: Uuid,
+    pub name: String,
+    pub title: String,
+    pub severity: Severity,
+    pub affected_service: Option<String>,
+    pub description: Option<String>,
+    pub is_active: bool,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

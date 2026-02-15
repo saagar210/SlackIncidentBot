@@ -1,6 +1,5 @@
 use crate::app_state::AppState;
 use crate::error::IncidentResult;
-use crate::services::incident::IncidentService;
 use crate::services::notification::NotificationService;
 use crate::slack::blocks;
 use crate::slack::events::SlashCommandPayload;
@@ -10,8 +9,11 @@ use chrono::Utc;
 use tracing::{error, info};
 
 pub async fn handle_declare(state: AppState, payload: SlashCommandPayload) -> IncidentResult<()> {
-    // Open modal
-    let modal = modals::declare_incident_modal(&state.config.services);
+    // Fetch active templates
+    let templates = crate::db::queries::templates::list_active_templates(&state.pool).await?;
+
+    // Open modal with templates
+    let modal = modals::declare_incident_modal(&state.config.services, &templates);
     state
         .slack_client
         .open_modal(&payload.trigger_id, modal)
@@ -83,37 +85,75 @@ pub async fn handle_modal_submission(
 
     info!("Declaring incident: {}", title);
 
-    // Create incident in DB
-    let incident_service = IncidentService::new(state.pool.clone());
-    let mut incident = incident_service
-        .create_incident(title.clone(), severity, service.clone(), commander_id.clone())
-        .await?;
+    // Generate incident ID upfront (needed for channel name)
+    let incident_id = uuid::Uuid::new_v4();
 
-    // Create incident channel
+    // Create Slack channel FIRST (fail fast if Slack is down)
     let date = Utc::now().date_naive();
-    let (channel_id, channel_name) = match channel::create_incident_channel(
+    let (channel_id, channel_name) = channel::create_incident_channel(
         &state.slack_client,
         &service,
         date,
-        incident.id,
+        incident_id,
     )
+    .await?;
+
+    // Create incident in DB with channel ID
+    // If this fails, we'll clean up the channel (compensation pattern)
+    let incident = match sqlx::query_as::<_, crate::db::models::Incident>(
+        r#"
+        INSERT INTO incidents (id, title, severity, affected_service, commander_id, status, declared_at, slack_channel_id)
+        VALUES ($1, $2, $3, $4, $5, 'declared', NOW(), $6)
+        RETURNING *
+        "#,
+    )
+    .bind(incident_id)
+    .bind(&title)
+    .bind(severity)
+    .bind(&service)
+    .bind(&commander_id)
+    .bind(&channel_id)
+    .fetch_one(&state.pool)
     .await
     {
-        Ok(result) => result,
+        Ok(inc) => inc,
         Err(e) => {
-            error!("Failed to create channel: {}", e);
-            // TODO: Known issue - incident is orphaned in DB without a channel.
-            // Future fix: Either wrap create+channel in a transaction with compensation,
-            // or implement a cleanup job to delete incidents without channels.
-            return Err(e);
+            error!("Failed to create incident in DB, cleaning up channel: {}", e);
+            // Compensation: Archive the channel we just created
+            if let Err(archive_err) = state.slack_client.archive_channel(&channel_id).await {
+                error!("Failed to archive channel during cleanup: {}", archive_err);
+            }
+            return Err(e.into());
         }
     };
 
-    // Update incident with channel ID
-    incident_service
-        .update_channel_id(incident.id, channel_id.clone())
+    // Log to timeline
+    let timeline_service = crate::services::timeline::TimelineService::new(state.pool.clone());
+    timeline_service
+        .log_event(
+            incident.id,
+            crate::db::models::TimelineEventType::Declared,
+            format!("Incident declared: {}", title),
+            commander_id.clone(),
+        )
         .await?;
-    incident.slack_channel_id = Some(channel_id.clone());
+
+    // Log to audit
+    let audit_service = crate::services::audit::AuditService::new(state.pool.clone());
+    audit_service
+        .log_action(
+            Some(incident.id),
+            "incident_declared".to_string(),
+            commander_id.clone(),
+            None,
+            None,
+            Some(serde_json::json!({
+                "title": title,
+                "severity": severity,
+                "service": service,
+            })),
+        )
+        .await?;
 
     // Invite users to channel
     let mut invitees = vec![commander_id.clone()];

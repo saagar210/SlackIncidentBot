@@ -151,6 +151,19 @@ impl SlackClient {
         Ok(())
     }
 
+    pub async fn archive_channel(&self, channel_id: &str) -> IncidentResult<()> {
+        let _: Value = self
+            .call_api(
+                "conversations.archive",
+                json!({
+                    "channel": channel_id,
+                }),
+            )
+            .await?;
+
+        Ok(())
+    }
+
     pub async fn post_message(&self, channel_id: &str, blocks: Vec<Value>) -> IncidentResult<String> {
         #[derive(Deserialize)]
         struct PostResponse {

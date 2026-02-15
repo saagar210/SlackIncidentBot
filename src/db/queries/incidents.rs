@@ -78,6 +78,32 @@ pub async fn update_channel_id(
     Ok(())
 }
 
+pub async fn delete_incident(pool: &PgPool, incident_id: IncidentId) -> IncidentResult<()> {
+    // Delete related records first (foreign key constraints)
+    sqlx::query("DELETE FROM incident_notifications WHERE incident_id = $1")
+        .bind(incident_id)
+        .execute(pool)
+        .await?;
+
+    sqlx::query("DELETE FROM incident_timeline WHERE incident_id = $1")
+        .bind(incident_id)
+        .execute(pool)
+        .await?;
+
+    sqlx::query("DELETE FROM audit_log WHERE incident_id = $1")
+        .bind(incident_id)
+        .execute(pool)
+        .await?;
+
+    // Delete the incident itself
+    sqlx::query("DELETE FROM incidents WHERE id = $1")
+        .bind(incident_id)
+        .execute(pool)
+        .await?;
+
+    Ok(())
+}
+
 pub async fn update_status(
     pool: &PgPool,
     incident_id: IncidentId,
