@@ -20,7 +20,7 @@ impl TestContext {
             statuspage_page_id: None,
             host: "0.0.0.0".to_string(),
             port: 3000,
-            p1_dm_recipients: vec!["U024TEST1".to_string()],
+            p1_users: vec!["U024TEST1".to_string()],
             p2_channels: vec!["C024TEST1".to_string()],
             p1_channels: vec!["C024TEST2".to_string()],
             service_owners: HashMap::new(),

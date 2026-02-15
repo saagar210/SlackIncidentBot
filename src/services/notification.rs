@@ -97,11 +97,21 @@ impl NotificationService {
                 }
 
                 // DM all P1 recipients
-                for user_id in &self.config.p1_dm_recipients {
+                for user_id in &self.config.p1_users {
                     if self.should_send_dm(user_id, incident.id).await {
                         self.send_dm(incident.id, user_id, &blocks).await?;
                     } else {
                         info!("Throttling DM to {} for incident {}", user_id, incident.id);
+                        // Log throttled notification to database for audit trail
+                        notifications::log_notification(
+                            &self.pool,
+                            incident.id,
+                            NotificationType::SlackDm,
+                            user_id.to_string(),
+                            NotificationStatus::Throttled,
+                            None,
+                        )
+                        .await?;
                     }
                 }
             }
@@ -128,10 +138,17 @@ impl NotificationService {
 
     async fn should_send_dm(&self, user_id: &str, incident_id: IncidentId) -> bool {
         let mut throttle_map = self.throttle_map.lock().await;
+
+        // Cleanup: Remove entries older than 10 minutes (2x throttle window)
+        // This prevents unbounded memory growth
+        let now = chrono::Utc::now();
+        throttle_map.retain(|_, last_sent| {
+            now.signed_duration_since(*last_sent).num_seconds() < 600
+        });
+
         let key = (user_id.to_string(), incident_id);
 
         if let Some(last_sent) = throttle_map.get(&key) {
-            let now = chrono::Utc::now();
             let elapsed = now.signed_duration_since(*last_sent);
 
             // Throttle: no more than 1 DM per 5 minutes
@@ -141,7 +158,7 @@ impl NotificationService {
         }
 
         // Update throttle map
-        throttle_map.insert(key, chrono::Utc::now());
+        throttle_map.insert(key, now);
         true
     }
 

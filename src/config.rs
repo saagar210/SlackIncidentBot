@@ -22,7 +22,7 @@ pub struct AppConfig {
 
     // Notification routing
     #[serde(default)]
-    pub p1_dm_recipients: Vec<String>,
+    pub p1_users: Vec<String>,
     #[serde(default)]
     pub p2_channels: Vec<String>,
     #[serde(default)]
@@ -83,7 +83,7 @@ impl AppConfig {
         }
 
         // Warn if notification channels not configured (medium severity issue)
-        if self.p1_channels.is_empty() && self.p1_dm_recipients.is_empty() {
+        if self.p1_channels.is_empty() && self.p1_users.is_empty() {
             tracing::warn!("No P1 notification channels configured - P1 incidents will not broadcast");
         }
         if self.p2_channels.is_empty() {

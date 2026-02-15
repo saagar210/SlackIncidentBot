@@ -135,6 +135,7 @@ pub enum NotificationStatus {
     Sent,
     Failed,
     Pending,
+    Throttled,
 }
 
 #[derive(Debug, Clone, FromRow)]

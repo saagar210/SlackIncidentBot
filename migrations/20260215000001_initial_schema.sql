@@ -45,7 +45,7 @@ CREATE TABLE incident_notifications (
     recipient TEXT NOT NULL,
     sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     status TEXT NOT NULL DEFAULT 'sent'
-        CHECK (status IN ('sent', 'failed', 'pending')),
+        CHECK (status IN ('sent', 'failed', 'pending', 'throttled')),
     error_message TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

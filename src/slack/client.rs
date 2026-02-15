@@ -28,6 +28,12 @@ pub struct Channel {
 #[derive(Debug, Deserialize)]
 struct ChannelsListResponse {
     channels: Vec<Channel>,
+    response_metadata: Option<ResponseMetadata>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ResponseMetadata {
+    next_cursor: Option<String>,
 }
 
 impl SlackClient {
@@ -97,19 +103,34 @@ impl SlackClient {
     }
 
     pub async fn list_conversations(&self) -> IncidentResult<Vec<Channel>> {
-        // TODO: Implement cursor-based pagination for workspaces with >1000 channels
-        // Current implementation only fetches first 1000 channels
-        let response: ChannelsListResponse = self
-            .call_api(
-                "conversations.list",
-                json!({
-                    "exclude_archived": true,
-                    "limit": 1000,
-                }),
-            )
-            .await?;
+        // Implement cursor-based pagination for workspaces with >1000 channels
+        let mut all_channels = Vec::new();
+        let mut cursor: Option<String> = None;
 
-        Ok(response.channels)
+        loop {
+            let mut params = json!({
+                "exclude_archived": true,
+                "limit": 1000,
+            });
+
+            if let Some(ref c) = cursor {
+                params["cursor"] = json!(c);
+            }
+
+            let response: ChannelsListResponse = self
+                .call_api("conversations.list", params)
+                .await?;
+
+            all_channels.extend(response.channels);
+
+            // Check if there are more pages
+            match response.response_metadata.and_then(|m| m.next_cursor) {
+                Some(next) if !next.is_empty() => cursor = Some(next),
+                _ => break,
+            }
+        }
+
+        Ok(all_channels)
     }
 
     pub async fn invite_users(&self, channel_id: &str, user_ids: Vec<String>) -> IncidentResult<()> {
