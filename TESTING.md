@@ -1,6 +1,6 @@
 # Testing Status
 
-## ✅ Unit Tests (15 tests, all passing)
+## ✅ Unit Tests (25 tests, all passing)
 
 ```bash
 cargo test --lib
@@ -31,7 +31,7 @@ cargo test --lib
 
 ---
 
-## ⚠️ Integration Tests (7 tests, require database)
+## ✅ Integration Tests (8 tests, all passing with PostgreSQL)
 
 ```bash
 # Requires PostgreSQL running
@@ -49,7 +49,7 @@ cargo test --test incident_lifecycle_test
 - ✅ **test_resolve_idempotent** - Multiple resolve calls succeed
 - ✅ **test_full_incident_lifecycle** - Full flow (declare → status → escalate → status → resolve)
 
-**Status:** Tests written and structured correctly. **Require PostgreSQL to run.**
+**Status:** Passing locally when PostgreSQL is available and `DATABASE_URL` is configured.
 
 ### Running Integration Tests
 
@@ -217,13 +217,13 @@ Expected:
 
 ## Test Summary
 
-**Unit Tests:** ✅ 15/15 passing
+**Unit Tests:** ✅ 25/25 passing
 
-**Integration Tests:** ⚠️ 7 tests written, require database setup to run
+**Integration Tests:** ✅ 8/8 passing (with PostgreSQL test database)
 
 **Manual QA:** 📋 Checklist ready for staging workspace testing
 
-**Code Coverage:** ~80% estimated (state machine, permissions, error handling covered)
+**Code Coverage:** Not currently measured in CI. Core state-machine, permission, and timeline flows are covered by tests.
 
 ---
 
@@ -242,4 +242,4 @@ Expected:
 - ❌ **Channel deduplication** - Needs Slack API mocking
 - ❌ **Concurrent incident creation** - Needs load testing setup
 
-These gaps are acceptable for MVP. The core business logic (state machine, permissions, timeline) is fully tested.
+These gaps are acceptable for current scope. The core business logic (state machine, permissions, timeline) is fully tested.
