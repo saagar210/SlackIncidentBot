@@ -1,0 +1,75 @@
+# ── Rust ──
+/target
+**/*.rs.bk
+*.pdb
+Cargo.lock
+
+# ── Environment Variables ──
+.env
+.env.local
+.env.*.local
+
+# ── IDE ──
+# VSCode
+.vscode/
+*.code-workspace
+
+# IntelliJ / CLion
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Vim / Neovim
+*.swp
+*.swo
+*~
+.*.sw?
+
+# Emacs
+*~
+\#*\#
+.\#*
+
+# ── Operating System ──
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Linux
+*~
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# ── Logs ──
+*.log
+logs/
+
+# ── Database ──
+*.db
+*.sqlite
+*.sqlite3
+
+# ── Docker ──
+# Don't ignore Dockerfile or docker-compose.yml
+# But ignore override files
+docker-compose.override.yml
+
+# ── Temporary Files ──
+tmp/
+temp/
+*.tmp
+
+# ── Test Coverage ──
+tarpaulin-report.html
+cobertura.xml
+lcov.info
+
+# ── Session Files ──
+/.claude/
+.claude_history

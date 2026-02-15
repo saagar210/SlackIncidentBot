@@ -1,0 +1,37 @@
+# ── Build artifacts ──
+target/
+**/*.rs.bk
+
+# ── IDE ──
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ── Environment ──
+.env
+.env.local
+.env.*.local
+
+# ── Git ──
+.git/
+.gitignore
+.gitattributes
+
+# ── Documentation ──
+*.md
+!README.md
+docs/
+
+# ── CI/CD ──
+.github/
+
+# ── Docker ──
+Dockerfile
+.dockerignore
+docker-compose.yml
+
+# ── Misc ──
+.DS_Store
+*.log

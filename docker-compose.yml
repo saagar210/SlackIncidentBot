@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  # ── PostgreSQL Database ──
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: incident_bot
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: incident_bot
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U incident_bot"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - incident-bot
+
+  # ── Incident Bot Application ──
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    environment:
+      # Override DATABASE_URL to use docker network
+      DATABASE_URL: postgres://incident_bot:password@postgres:5432/incident_bot
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - incident-bot
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+
+networks:
+  incident-bot:
+    driver: bridge
