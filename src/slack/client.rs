@@ -1,6 +1,6 @@
 use crate::error::{IncidentError, IncidentResult};
 use reqwest::Client;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::{json, Value};
 use std::time::Duration;
 use tracing::{debug, error};
@@ -69,7 +69,9 @@ impl SlackClient {
         let slack_response: SlackResponse<T> = response.json().await?;
 
         if !slack_response.ok {
-            let error_code = slack_response.error.unwrap_or_else(|| "unknown".to_string());
+            let error_code = slack_response
+                .error
+                .unwrap_or_else(|| "unknown".to_string());
             error!("Slack API error: {}", error_code);
             return Err(IncidentError::SlackAPIError {
                 message: format!("API call failed: {}", method),
@@ -77,10 +79,12 @@ impl SlackClient {
             });
         }
 
-        slack_response.data.ok_or_else(|| IncidentError::SlackAPIError {
-            message: "No data in response".to_string(),
-            slack_error_code: "no_data".to_string(),
-        })
+        slack_response
+            .data
+            .ok_or_else(|| IncidentError::SlackAPIError {
+                message: "No data in response".to_string(),
+                slack_error_code: "no_data".to_string(),
+            })
     }
 
     pub async fn create_conversation(&self, name: &str) -> IncidentResult<String> {
@@ -117,9 +121,8 @@ impl SlackClient {
                 params["cursor"] = json!(c);
             }
 
-            let response: ChannelsListResponse = self
-                .call_api("conversations.list", params)
-                .await?;
+            let response: ChannelsListResponse =
+                self.call_api("conversations.list", params).await?;
 
             all_channels.extend(response.channels);
 
@@ -133,7 +136,11 @@ impl SlackClient {
         Ok(all_channels)
     }
 
-    pub async fn invite_users(&self, channel_id: &str, user_ids: Vec<String>) -> IncidentResult<()> {
+    pub async fn invite_users(
+        &self,
+        channel_id: &str,
+        user_ids: Vec<String>,
+    ) -> IncidentResult<()> {
         if user_ids.is_empty() {
             return Ok(());
         }
@@ -164,7 +171,11 @@ impl SlackClient {
         Ok(())
     }
 
-    pub async fn post_message(&self, channel_id: &str, blocks: Vec<Value>) -> IncidentResult<String> {
+    pub async fn post_message(
+        &self,
+        channel_id: &str,
+        blocks: Vec<Value>,
+    ) -> IncidentResult<String> {
         #[derive(Deserialize)]
         struct PostResponse {
             ts: String,
@@ -233,7 +244,11 @@ impl SlackClient {
         Ok(())
     }
 
-    pub async fn post_to_response_url(&self, response_url: &str, blocks: Vec<Value>) -> IncidentResult<()> {
+    pub async fn post_to_response_url(
+        &self,
+        response_url: &str,
+        blocks: Vec<Value>,
+    ) -> IncidentResult<()> {
         let response = self
             .http_client
             .post(response_url)

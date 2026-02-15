@@ -46,15 +46,13 @@ pub fn incident_declared_blocks(incident: &Incident) -> Vec<Value> {
 }
 
 pub fn status_update_blocks(severity: Severity, message: &str, posted_by: &str) -> Vec<Value> {
-    vec![
-        json!({
-            "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": format!("{} *Status Update*\n{}\n_Posted by <@{}>_", severity.emoji(), message, posted_by)
-            }
-        }),
-    ]
+    vec![json!({
+        "type": "section",
+        "text": {
+            "type": "mrkdwn",
+            "text": format!("{} *Status Update*\n{}\n_Posted by <@{}>_", severity.emoji(), message, posted_by)
+        }
+    })]
 }
 
 pub fn severity_change_blocks(

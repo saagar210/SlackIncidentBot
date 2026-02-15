@@ -1,6 +1,6 @@
 use crate::db::models::{IncidentId, TimelineEvent, TimelineEventType};
 use crate::error::IncidentResult;
-use sqlx::PgPool;
+use sqlx_postgres::PgPool;
 
 pub async fn log_event(
     pool: &PgPool,
@@ -9,7 +9,7 @@ pub async fn log_event(
     message: String,
     posted_by: String,
 ) -> IncidentResult<TimelineEvent> {
-    let event = sqlx::query_as::<_, TimelineEvent>(
+    let event = sqlx::query_as::query_as::<_, TimelineEvent>(
         r#"
         INSERT INTO incident_timeline (incident_id, event_type, message, posted_by)
         VALUES ($1, $2, $3, $4)
@@ -17,7 +17,7 @@ pub async fn log_event(
         "#,
     )
     .bind(incident_id)
-    .bind(event_type)
+    .bind(event_type.as_db_str())
     .bind(message)
     .bind(posted_by)
     .fetch_one(pool)
@@ -26,8 +26,11 @@ pub async fn log_event(
     Ok(event)
 }
 
-pub async fn get_timeline(pool: &PgPool, incident_id: IncidentId) -> IncidentResult<Vec<TimelineEvent>> {
-    let events = sqlx::query_as::<_, TimelineEvent>(
+pub async fn get_timeline(
+    pool: &PgPool,
+    incident_id: IncidentId,
+) -> IncidentResult<Vec<TimelineEvent>> {
+    let events = sqlx::query_as::query_as::<_, TimelineEvent>(
         r#"
         SELECT * FROM incident_timeline
         WHERE incident_id = $1

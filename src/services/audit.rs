@@ -2,7 +2,7 @@ use crate::db::models::IncidentId;
 use crate::db::queries::audit;
 use crate::error::IncidentResult;
 use serde_json::Value;
-use sqlx::PgPool;
+use sqlx_postgres::PgPool;
 
 pub struct AuditService {
     pool: PgPool,
@@ -22,6 +22,15 @@ impl AuditService {
         new_state: Option<Value>,
         details: Option<Value>,
     ) -> IncidentResult<()> {
-        audit::log_action(&self.pool, incident_id, action, actor_id, old_state, new_state, details).await
+        audit::log_action(
+            &self.pool,
+            incident_id,
+            action,
+            actor_id,
+            old_state,
+            new_state,
+            details,
+        )
+        .await
     }
 }

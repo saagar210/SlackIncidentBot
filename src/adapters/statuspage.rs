@@ -73,11 +73,11 @@ impl StatuspageClient {
 
         if !response.status().is_success() {
             let status_code = response.status();
-            let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
-            error!(
-                "Statuspage API error ({}): {}",
-                status_code, error_text
-            );
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_string());
+            error!("Statuspage API error ({}): {}", status_code, error_text);
             return Err(IncidentError::ExternalAPIError {
                 service: "Statuspage".to_string(),
                 message: format!("HTTP {}: {}", status_code, error_text),
@@ -99,8 +99,8 @@ impl StatuspageClient {
             IncidentStatus::Declared | IncidentStatus::Investigating => {
                 // Map severity to impact level
                 match severity {
-                    Severity::P1 => "major_outage",      // Critical impact
-                    Severity::P2 => "partial_outage",    // High impact
+                    Severity::P1 => "major_outage",         // Critical impact
+                    Severity::P2 => "partial_outage",       // High impact
                     Severity::P3 => "degraded_performance", // Medium impact
                     Severity::P4 => "degraded_performance", // Low impact
                 }
@@ -108,7 +108,7 @@ impl StatuspageClient {
             IncidentStatus::Identified | IncidentStatus::Monitoring => {
                 // Issue identified/being monitored
                 match severity {
-                    Severity::P1 => "partial_outage",     // Still significant
+                    Severity::P1 => "partial_outage", // Still significant
                     Severity::P2 => "degraded_performance",
                     Severity::P3 | Severity::P4 => "degraded_performance",
                 }
@@ -148,11 +148,26 @@ mod tests {
         use IncidentStatus::*;
 
         // P1 Critical
-        assert_eq!(StatuspageClient::map_status(Declared, Severity::P1), "major_outage");
-        assert_eq!(StatuspageClient::map_status(Investigating, Severity::P1), "major_outage");
-        assert_eq!(StatuspageClient::map_status(Identified, Severity::P1), "partial_outage");
-        assert_eq!(StatuspageClient::map_status(Monitoring, Severity::P1), "partial_outage");
-        assert_eq!(StatuspageClient::map_status(Resolved, Severity::P1), "operational");
+        assert_eq!(
+            StatuspageClient::map_status(Declared, Severity::P1),
+            "major_outage"
+        );
+        assert_eq!(
+            StatuspageClient::map_status(Investigating, Severity::P1),
+            "major_outage"
+        );
+        assert_eq!(
+            StatuspageClient::map_status(Identified, Severity::P1),
+            "partial_outage"
+        );
+        assert_eq!(
+            StatuspageClient::map_status(Monitoring, Severity::P1),
+            "partial_outage"
+        );
+        assert_eq!(
+            StatuspageClient::map_status(Resolved, Severity::P1),
+            "operational"
+        );
     }
 
     #[test]
@@ -160,10 +175,22 @@ mod tests {
         use IncidentStatus::*;
 
         // P2 High
-        assert_eq!(StatuspageClient::map_status(Declared, Severity::P2), "partial_outage");
-        assert_eq!(StatuspageClient::map_status(Investigating, Severity::P2), "partial_outage");
-        assert_eq!(StatuspageClient::map_status(Identified, Severity::P2), "degraded_performance");
-        assert_eq!(StatuspageClient::map_status(Resolved, Severity::P2), "operational");
+        assert_eq!(
+            StatuspageClient::map_status(Declared, Severity::P2),
+            "partial_outage"
+        );
+        assert_eq!(
+            StatuspageClient::map_status(Investigating, Severity::P2),
+            "partial_outage"
+        );
+        assert_eq!(
+            StatuspageClient::map_status(Identified, Severity::P2),
+            "degraded_performance"
+        );
+        assert_eq!(
+            StatuspageClient::map_status(Resolved, Severity::P2),
+            "operational"
+        );
     }
 
     #[test]
@@ -171,8 +198,17 @@ mod tests {
         use IncidentStatus::*;
 
         // P3/P4 Low priority
-        assert_eq!(StatuspageClient::map_status(Declared, Severity::P3), "degraded_performance");
-        assert_eq!(StatuspageClient::map_status(Investigating, Severity::P4), "degraded_performance");
-        assert_eq!(StatuspageClient::map_status(Resolved, Severity::P3), "operational");
+        assert_eq!(
+            StatuspageClient::map_status(Declared, Severity::P3),
+            "degraded_performance"
+        );
+        assert_eq!(
+            StatuspageClient::map_status(Investigating, Severity::P4),
+            "degraded_performance"
+        );
+        assert_eq!(
+            StatuspageClient::map_status(Resolved, Severity::P3),
+            "operational"
+        );
     }
 }

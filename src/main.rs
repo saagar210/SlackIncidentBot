@@ -64,8 +64,14 @@ async fn main() -> anyhow::Result<()> {
     // Build router
     let app = Router::new()
         .route("/health", get(health_check))
-        .route("/slack/commands", post(incident_bot::slack::events::handle_slash_command))
-        .route("/slack/interactions", post(incident_bot::slack::events::handle_interaction))
+        .route(
+            "/slack/commands",
+            post(incident_bot::slack::events::handle_slash_command),
+        )
+        .route(
+            "/slack/interactions",
+            post(incident_bot::slack::events::handle_interaction),
+        )
         .with_state(state)
         .layer(TraceLayer::new_for_http());
 

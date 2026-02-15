@@ -1,7 +1,7 @@
 use crate::config::AppConfig;
 use crate::jobs::Job;
 use crate::slack::client::SlackClient;
-use sqlx::PgPool;
+use sqlx_postgres::PgPool;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 

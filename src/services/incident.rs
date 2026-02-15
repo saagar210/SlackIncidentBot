@@ -4,7 +4,7 @@ use crate::error::{IncidentError, IncidentResult};
 use crate::services::audit::AuditService;
 use crate::services::timeline::TimelineService;
 use serde_json::json;
-use sqlx::PgPool;
+use sqlx_postgres::PgPool;
 use tracing::info;
 
 pub struct IncidentService {
@@ -248,7 +248,15 @@ impl IncidentService {
         incident_queries::get_incident_by_channel(&self.pool, channel_id).await
     }
 
-    pub async fn validate_commander(&self, incident: &Incident, user_id: &str) -> IncidentResult<()> {
+    pub async fn get_latest_by_channel(&self, channel_id: &str) -> IncidentResult<Incident> {
+        incident_queries::get_latest_incident_by_channel(&self.pool, channel_id).await
+    }
+
+    pub async fn validate_commander(
+        &self,
+        incident: &Incident,
+        user_id: &str,
+    ) -> IncidentResult<()> {
         if incident.commander_id != user_id {
             return Err(IncidentError::PermissionDenied {
                 user_id: user_id.to_string(),

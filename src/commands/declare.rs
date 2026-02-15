@@ -52,12 +52,13 @@ pub async fn handle_modal_submission(
             reason: "Required".to_string(),
         })?;
 
-    let severity: crate::db::models::Severity = severity_str.parse().map_err(|e| {
-        crate::error::IncidentError::ValidationError {
-            field: "severity".to_string(),
-            reason: e,
-        }
-    })?;
+    let severity: crate::db::models::Severity =
+        severity_str
+            .parse()
+            .map_err(|e| crate::error::IncidentError::ValidationError {
+                field: "severity".to_string(),
+                reason: e,
+            })?;
 
     let service = values
         .get("service_block")
@@ -80,7 +81,10 @@ pub async fn handle_modal_submission(
         .to_string();
 
     if commander_id == user_id {
-        info!("Commander not explicitly selected, defaulting to modal submitter: {}", user_id);
+        info!(
+            "Commander not explicitly selected, defaulting to modal submitter: {}",
+            user_id
+        );
     }
 
     info!("Declaring incident: {}", title);
@@ -90,17 +94,12 @@ pub async fn handle_modal_submission(
 
     // Create Slack channel FIRST (fail fast if Slack is down)
     let date = Utc::now().date_naive();
-    let (channel_id, channel_name) = channel::create_incident_channel(
-        &state.slack_client,
-        &service,
-        date,
-        incident_id,
-    )
-    .await?;
+    let (channel_id, channel_name) =
+        channel::create_incident_channel(&state.slack_client, &service, date, incident_id).await?;
 
     // Create incident in DB with channel ID
     // If this fails, we'll clean up the channel (compensation pattern)
-    let incident = match sqlx::query_as::<_, crate::db::models::Incident>(
+    let incident = match sqlx::query_as::query_as::<_, crate::db::models::Incident>(
         r#"
         INSERT INTO incidents (id, title, severity, affected_service, commander_id, status, declared_at, slack_channel_id)
         VALUES ($1, $2, $3, $4, $5, 'declared', NOW(), $6)
@@ -109,7 +108,7 @@ pub async fn handle_modal_submission(
     )
     .bind(incident_id)
     .bind(&title)
-    .bind(severity)
+    .bind(severity.as_db_str())
     .bind(&service)
     .bind(&commander_id)
     .bind(&channel_id)
@@ -174,7 +173,11 @@ pub async fn handle_modal_submission(
 
     // Post and pin incident details
     let detail_blocks = blocks::incident_declared_blocks(&incident);
-    match state.slack_client.post_message(&channel_id, detail_blocks).await {
+    match state
+        .slack_client
+        .post_message(&channel_id, detail_blocks)
+        .await
+    {
         Ok(ts) => {
             // Pin the message
             if let Err(e) = state.slack_client.pin_message(&channel_id, &ts).await {
@@ -203,7 +206,9 @@ pub async fn handle_modal_submission(
     }
 
     // Enqueue Statuspage sync if component mapping exists
-    if let Ok(Some(component_id)) = crate::db::queries::statuspage::get_component_id(&state.pool, &service).await {
+    if let Ok(Some(component_id)) =
+        crate::db::queries::statuspage::get_component_id(&state.pool, &service).await
+    {
         let job = crate::jobs::Job::StatuspageSync {
             incident_id: incident.id,
             component_id,

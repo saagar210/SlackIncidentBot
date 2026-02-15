@@ -1,6 +1,6 @@
 use crate::db::models::{IncidentId, NotificationRecord, NotificationStatus, NotificationType};
 use crate::error::IncidentResult;
-use sqlx::PgPool;
+use sqlx_postgres::PgPool;
 
 pub async fn log_notification(
     pool: &PgPool,
@@ -10,7 +10,7 @@ pub async fn log_notification(
     status: NotificationStatus,
     error_message: Option<String>,
 ) -> IncidentResult<NotificationRecord> {
-    let record = sqlx::query_as::<_, NotificationRecord>(
+    let record = sqlx::query_as::query_as::<_, NotificationRecord>(
         r#"
         INSERT INTO incident_notifications (incident_id, notification_type, recipient, status, error_message)
         VALUES ($1, $2, $3, $4, $5)
@@ -18,9 +18,9 @@ pub async fn log_notification(
         "#,
     )
     .bind(incident_id)
-    .bind(notification_type)
+    .bind(notification_type.as_db_str())
     .bind(recipient)
-    .bind(status)
+    .bind(status.as_db_str())
     .bind(error_message)
     .fetch_one(pool)
     .await?;

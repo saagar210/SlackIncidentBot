@@ -35,7 +35,10 @@ impl JobWorker {
         info!("Job worker stopped");
     }
 
-    async fn process_job_static(statuspage_client: Option<StatuspageClient>, job: Job) -> Result<(), String> {
+    async fn process_job_static(
+        statuspage_client: Option<StatuspageClient>,
+        job: Job,
+    ) -> Result<(), String> {
         match job {
             Job::StatuspageSync {
                 incident_id,
@@ -55,7 +58,10 @@ impl JobWorker {
                     .map_err(|e| e.to_string())?;
                 } else {
                     // No Statuspage client configured, skip
-                    info!("Statuspage not configured, skipping sync for incident {}", incident_id);
+                    info!(
+                        "Statuspage not configured, skipping sync for incident {}",
+                        incident_id
+                    );
                 }
             }
         }

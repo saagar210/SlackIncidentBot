@@ -9,14 +9,17 @@ use tracing::info;
 pub async fn handle_timeline(state: AppState, payload: SlashCommandPayload) -> IncidentResult<()> {
     // Get incident from channel
     let incident_service = IncidentService::new(state.pool.clone());
-    let incident = match incident_service.get_by_channel(&payload.channel_id).await {
+    let incident = match incident_service
+        .get_latest_by_channel(&payload.channel_id)
+        .await
+    {
         Ok(inc) => inc,
         Err(IncidentError::NotFound) => {
             return state
                 .slack_client
                 .post_to_response_url(
                     &payload.response_url,
-                    blocks::error_blocks("No active incident in this channel"),
+                    blocks::error_blocks("No incident found in this channel"),
                 )
                 .await;
         }

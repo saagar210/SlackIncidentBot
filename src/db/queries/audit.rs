@@ -1,7 +1,7 @@
 use crate::db::models::IncidentId;
 use crate::error::IncidentResult;
 use serde_json::Value;
-use sqlx::PgPool;
+use sqlx_postgres::PgPool;
 
 pub async fn log_action(
     pool: &PgPool,
@@ -12,7 +12,7 @@ pub async fn log_action(
     new_state: Option<Value>,
     details: Option<Value>,
 ) -> IncidentResult<()> {
-    sqlx::query(
+    sqlx::query::query(
         r#"
         INSERT INTO audit_log (incident_id, action, actor_id, old_state, new_state, details)
         VALUES ($1, $2, $3, $4, $5, $6)
