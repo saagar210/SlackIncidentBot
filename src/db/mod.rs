@@ -2,8 +2,8 @@ pub mod models;
 pub mod queries;
 
 use crate::error::IncidentResult;
-use sqlx::postgres::PgPoolOptions;
-use sqlx::PgPool;
+use sqlx_postgres::PgPool;
+use sqlx_postgres::PgPoolOptions;
 use tracing::info;
 
 pub async fn create_pool(database_url: &str) -> IncidentResult<PgPool> {
@@ -20,8 +20,15 @@ pub async fn create_pool(database_url: &str) -> IncidentResult<PgPool> {
 }
 
 pub async fn run_migrations(pool: &PgPool) -> IncidentResult<()> {
+    use std::path::Path;
+
     info!("Running database migrations");
-    sqlx::migrate!("./migrations")
+    let migrations_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("migrations");
+    let migrator = sqlx::migrate::Migrator::new(migrations_dir.as_path())
+        .await
+        .map_err(|e| crate::error::IncidentError::InternalError(e.to_string()))?;
+
+    migrator
         .run(pool)
         .await
         .map_err(|e| crate::error::IncidentError::DatabaseError(e.into()))?;
@@ -30,5 +37,5 @@ pub async fn run_migrations(pool: &PgPool) -> IncidentResult<()> {
 }
 
 pub async fn health_check(pool: &PgPool) -> bool {
-    sqlx::query("SELECT 1").fetch_one(pool).await.is_ok()
+    sqlx::query::query("SELECT 1").fetch_one(pool).await.is_ok()
 }

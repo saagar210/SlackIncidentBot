@@ -1,7 +1,7 @@
 use crate::db::models::{IncidentId, TimelineEvent, TimelineEventType};
 use crate::db::queries::timeline as timeline_queries;
 use crate::error::IncidentResult;
-use sqlx::PgPool;
+use sqlx_postgres::PgPool;
 
 pub struct TimelineService {
     pool: PgPool,
@@ -22,7 +22,10 @@ impl TimelineService {
         timeline_queries::log_event(&self.pool, incident_id, event_type, message, posted_by).await
     }
 
-    pub async fn get_timeline(&self, incident_id: IncidentId) -> IncidentResult<Vec<TimelineEvent>> {
+    pub async fn get_timeline(
+        &self,
+        incident_id: IncidentId,
+    ) -> IncidentResult<Vec<TimelineEvent>> {
         timeline_queries::get_timeline(&self.pool, incident_id).await
     }
 

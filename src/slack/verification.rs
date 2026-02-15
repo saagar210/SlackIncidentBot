@@ -10,11 +10,12 @@ pub fn verify_slack_signature(
     body: &str,
     signature: &str,
 ) -> IncidentResult<()> {
-    // Check if timestamp is recent (within 5 minutes) and not from the future
-    let request_time = timestamp.parse::<i64>().map_err(|_| IncidentError::InvalidSignature)?;
+    // Check if timestamp is recent (within 5 minutes), allowing small clock skew.
+    let request_time = timestamp
+        .parse::<i64>()
+        .map_err(|_| IncidentError::InvalidSignature)?;
     let current_time = chrono::Utc::now().timestamp();
-    // Reject if timestamp is too old OR from the future (replay attack protection)
-    if current_time - request_time > 60 * 5 || request_time > current_time {
+    if (current_time - request_time).abs() > 60 * 5 {
         return Err(IncidentError::InvalidSignature);
     }
 
@@ -23,13 +24,15 @@ pub fn verify_slack_signature(
     let mut mac = HmacSha256::new_from_slice(signing_secret.as_bytes())
         .map_err(|_| IncidentError::InvalidSignature)?;
     mac.update(base_string.as_bytes());
-    let result = mac.finalize();
-    let expected_signature = format!("v0={}", hex::encode(result.into_bytes()));
+    let provided_signature = signature
+        .strip_prefix("v0=")
+        .ok_or(IncidentError::InvalidSignature)?;
+    let provided_bytes =
+        hex::decode(provided_signature).map_err(|_| IncidentError::InvalidSignature)?;
 
-    // Compare signatures
-    if expected_signature != signature {
-        return Err(IncidentError::InvalidSignature);
-    }
+    // Constant-time comparison via HMAC verification API.
+    mac.verify_slice(&provided_bytes)
+        .map_err(|_| IncidentError::InvalidSignature)?;
 
     Ok(())
 }
@@ -41,7 +44,7 @@ mod tests {
     #[test]
     fn test_valid_signature() {
         let signing_secret = "test_secret";
-        let timestamp = "1531420618";
+        let timestamp = chrono::Utc::now().timestamp().to_string();
         let body = "token=xoxb-test&team_id=T1234";
 
         // Generate valid signature
@@ -50,11 +53,8 @@ mod tests {
         mac.update(base_string.as_bytes());
         let signature = format!("v0={}", hex::encode(mac.finalize().into_bytes()));
 
-        // Should succeed (we'll skip timestamp check in this test)
-        // In real test we'd mock time
-        let result = verify_slack_signature(signing_secret, timestamp, body, &signature);
-        // This will fail due to timestamp being old, but demonstrates the signature calc
-        assert!(result.is_err()); // Timestamp too old
+        let result = verify_slack_signature(signing_secret, &timestamp, body, &signature);
+        assert!(result.is_ok());
     }
 
     #[test]
@@ -65,6 +65,34 @@ mod tests {
         let bad_signature = "v0=wrong";
 
         let result = verify_slack_signature(signing_secret, timestamp, body, bad_signature);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_future_timestamp_within_skew_is_allowed() {
+        let signing_secret = "test_secret";
+        let timestamp = (chrono::Utc::now().timestamp() + 120).to_string();
+        let body = "token=xoxb-test&team_id=T1234";
+        let base_string = format!("v0:{}:{}", timestamp, body);
+        let mut mac = HmacSha256::new_from_slice(signing_secret.as_bytes()).unwrap();
+        mac.update(base_string.as_bytes());
+        let signature = format!("v0={}", hex::encode(mac.finalize().into_bytes()));
+
+        let result = verify_slack_signature(signing_secret, &timestamp, body, &signature);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_future_timestamp_outside_skew_is_rejected() {
+        let signing_secret = "test_secret";
+        let timestamp = (chrono::Utc::now().timestamp() + 301).to_string();
+        let body = "token=xoxb-test&team_id=T1234";
+        let base_string = format!("v0:{}:{}", timestamp, body);
+        let mut mac = HmacSha256::new_from_slice(signing_secret.as_bytes()).unwrap();
+        mac.update(base_string.as_bytes());
+        let signature = format!("v0={}", hex::encode(mac.finalize().into_bytes()));
+
+        let result = verify_slack_signature(signing_secret, &timestamp, body, &signature);
         assert!(result.is_err());
     }
 }

@@ -1,8 +1,6 @@
 use crate::db::models::{Incident, IncidentId, IncidentStatus, Severity, SlackChannelId};
 use crate::error::IncidentResult;
-use chrono::{DateTime, Utc};
-use sqlx::PgPool;
-use uuid::Uuid;
+use sqlx_postgres::PgPool;
 
 pub async fn create_incident(
     pool: &PgPool,
@@ -11,7 +9,7 @@ pub async fn create_incident(
     affected_service: String,
     commander_id: String,
 ) -> IncidentResult<Incident> {
-    let incident = sqlx::query_as::<_, Incident>(
+    let incident = sqlx::query_as::query_as::<_, Incident>(
         r#"
         INSERT INTO incidents (title, severity, affected_service, commander_id, status, declared_at)
         VALUES ($1, $2, $3, $4, 'declared', NOW())
@@ -19,7 +17,7 @@ pub async fn create_incident(
         "#,
     )
     .bind(title)
-    .bind(severity)
+    .bind(severity.as_db_str())
     .bind(affected_service)
     .bind(commander_id)
     .fetch_one(pool)
@@ -29,7 +27,7 @@ pub async fn create_incident(
 }
 
 pub async fn get_incident_by_id(pool: &PgPool, id: IncidentId) -> IncidentResult<Incident> {
-    let incident = sqlx::query_as::<_, Incident>(
+    let incident = sqlx::query_as::query_as::<_, Incident>(
         r#"
         SELECT * FROM incidents WHERE id = $1
         "#,
@@ -42,13 +40,30 @@ pub async fn get_incident_by_id(pool: &PgPool, id: IncidentId) -> IncidentResult
     Ok(incident)
 }
 
-pub async fn get_incident_by_channel(
+pub async fn get_incident_by_channel(pool: &PgPool, channel_id: &str) -> IncidentResult<Incident> {
+    let incident = sqlx::query_as::query_as::<_, Incident>(
+        r#"
+        SELECT * FROM incidents WHERE slack_channel_id = $1 AND status != 'resolved'
+        "#,
+    )
+    .bind(channel_id)
+    .fetch_optional(pool)
+    .await?
+    .ok_or(crate::error::IncidentError::NotFound)?;
+
+    Ok(incident)
+}
+
+pub async fn get_latest_incident_by_channel(
     pool: &PgPool,
     channel_id: &str,
 ) -> IncidentResult<Incident> {
-    let incident = sqlx::query_as::<_, Incident>(
+    let incident = sqlx::query_as::query_as::<_, Incident>(
         r#"
-        SELECT * FROM incidents WHERE slack_channel_id = $1 AND status != 'resolved'
+        SELECT * FROM incidents
+        WHERE slack_channel_id = $1
+        ORDER BY declared_at DESC
+        LIMIT 1
         "#,
     )
     .bind(channel_id)
@@ -64,7 +79,7 @@ pub async fn update_channel_id(
     incident_id: IncidentId,
     channel_id: SlackChannelId,
 ) -> IncidentResult<()> {
-    sqlx::query(
+    sqlx::query::query(
         r#"
         UPDATE incidents SET slack_channel_id = $1, updated_at = NOW()
         WHERE id = $2
@@ -80,23 +95,23 @@ pub async fn update_channel_id(
 
 pub async fn delete_incident(pool: &PgPool, incident_id: IncidentId) -> IncidentResult<()> {
     // Delete related records first (foreign key constraints)
-    sqlx::query("DELETE FROM incident_notifications WHERE incident_id = $1")
+    sqlx::query::query("DELETE FROM incident_notifications WHERE incident_id = $1")
         .bind(incident_id)
         .execute(pool)
         .await?;
 
-    sqlx::query("DELETE FROM incident_timeline WHERE incident_id = $1")
+    sqlx::query::query("DELETE FROM incident_timeline WHERE incident_id = $1")
         .bind(incident_id)
         .execute(pool)
         .await?;
 
-    sqlx::query("DELETE FROM audit_log WHERE incident_id = $1")
+    sqlx::query::query("DELETE FROM audit_log WHERE incident_id = $1")
         .bind(incident_id)
         .execute(pool)
         .await?;
 
     // Delete the incident itself
-    sqlx::query("DELETE FROM incidents WHERE id = $1")
+    sqlx::query::query("DELETE FROM incidents WHERE id = $1")
         .bind(incident_id)
         .execute(pool)
         .await?;
@@ -109,13 +124,13 @@ pub async fn update_status(
     incident_id: IncidentId,
     status: IncidentStatus,
 ) -> IncidentResult<()> {
-    sqlx::query(
+    sqlx::query::query(
         r#"
         UPDATE incidents SET status = $1, updated_at = NOW()
         WHERE id = $2
         "#,
     )
-    .bind(status)
+    .bind(status.as_db_str())
     .bind(incident_id)
     .execute(pool)
     .await?;
@@ -128,13 +143,13 @@ pub async fn update_severity(
     incident_id: IncidentId,
     severity: Severity,
 ) -> IncidentResult<()> {
-    sqlx::query(
+    sqlx::query::query(
         r#"
         UPDATE incidents SET severity = $1, updated_at = NOW()
         WHERE id = $2
         "#,
     )
-    .bind(severity)
+    .bind(severity.as_db_str())
     .bind(incident_id)
     .execute(pool)
     .await?;
@@ -142,11 +157,8 @@ pub async fn update_severity(
     Ok(())
 }
 
-pub async fn resolve_incident(
-    pool: &PgPool,
-    incident_id: IncidentId,
-) -> IncidentResult<Incident> {
-    let incident = sqlx::query_as::<_, Incident>(
+pub async fn resolve_incident(pool: &PgPool, incident_id: IncidentId) -> IncidentResult<Incident> {
+    let incident = sqlx::query_as::query_as::<_, Incident>(
         r#"
         UPDATE incidents
         SET status = 'resolved',
@@ -165,7 +177,7 @@ pub async fn resolve_incident(
 }
 
 pub async fn list_channels_by_prefix(pool: &PgPool, prefix: &str) -> IncidentResult<Vec<String>> {
-    let channels = sqlx::query_scalar::<_, String>(
+    let channels = sqlx::query_scalar::query_scalar::<_, String>(
         r#"
         SELECT slack_channel_id FROM incidents
         WHERE slack_channel_id LIKE $1 || '%' AND slack_channel_id IS NOT NULL

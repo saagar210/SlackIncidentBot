@@ -1,20 +1,16 @@
-use crate::db::models::{Incident, IncidentId};
+use crate::db::models::Incident;
 use crate::error::IncidentResult;
 use crate::services::timeline::TimelineService;
-use sqlx::PgPool;
+use sqlx_postgres::PgPool;
 
 pub struct PostmortemService {
-    pool: PgPool,
     timeline_service: TimelineService,
 }
 
 impl PostmortemService {
     pub fn new(pool: PgPool) -> Self {
         let timeline_service = TimelineService::new(pool.clone());
-        Self {
-            pool,
-            timeline_service,
-        }
+        Self { timeline_service }
     }
 
     pub async fn generate(&self, incident: &Incident) -> IncidentResult<String> {
@@ -64,7 +60,10 @@ impl PostmortemService {
             incident.declared_at.format("%Y-%m-%d"),
             duration_text,
             incident.declared_at.format("%Y-%m-%d %H:%M %Z"),
-            incident.resolved_at.expect("Resolved incidents must have resolved_at timestamp").format("%Y-%m-%d %H:%M %Z").to_string(),
+            incident
+                .resolved_at
+                .expect("Resolved incidents must have resolved_at timestamp")
+                .format("%Y-%m-%d %H:%M %Z"),
             incident.severity.label(),
             incident.affected_service,
             incident.commander_id,

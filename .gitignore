@@ -73,3 +73,6 @@ lcov.info
 # ── Session Files ──
 /.claude/
 .claude_history
+
+# ── Local Audit Workspace ──
+.codex_audit/

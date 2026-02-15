@@ -4,18 +4,21 @@ use crate::db::queries::notifications;
 use crate::error::IncidentResult;
 use crate::slack::client::SlackClient;
 use serde_json::Value;
-use sqlx::PgPool;
+use sqlx_postgres::PgPool;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tracing::{error, info, warn};
+
+type NotificationThrottleKey = (String, IncidentId);
+type NotificationThrottleMap = HashMap<NotificationThrottleKey, chrono::DateTime<chrono::Utc>>;
 
 pub struct NotificationService {
     pool: PgPool,
     slack_client: SlackClient,
     config: Arc<AppConfig>,
     // Throttle map: (recipient, incident_id) -> last notification timestamp
-    throttle_map: Arc<Mutex<HashMap<(String, IncidentId), chrono::DateTime<chrono::Utc>>>>,
+    throttle_map: Arc<Mutex<NotificationThrottleMap>>,
 }
 
 impl NotificationService {
@@ -33,7 +36,8 @@ impl NotificationService {
         incident: &Incident,
         blocks: Vec<Value>,
     ) -> IncidentResult<()> {
-        self.route_by_severity(incident, blocks, "incident_declared").await
+        self.route_by_severity(incident, blocks, "incident_declared")
+            .await
     }
 
     pub async fn notify_status_update(
@@ -43,7 +47,8 @@ impl NotificationService {
     ) -> IncidentResult<()> {
         // Status updates only go to incident channel
         if let Some(channel_id) = &incident.slack_channel_id {
-            self.send_to_channel(incident.id, channel_id, &blocks).await?;
+            self.send_to_channel(incident.id, channel_id, &blocks)
+                .await?;
         }
         Ok(())
     }
@@ -59,11 +64,13 @@ impl NotificationService {
         let escalating_to_p2 = incident.severity == Severity::P2 && old_severity != Severity::P2;
 
         if escalating_to_p1 || escalating_to_p2 {
-            self.route_by_severity(incident, blocks, "severity_escalation").await
+            self.route_by_severity(incident, blocks, "severity_escalation")
+                .await
         } else {
             // Downgrade or same severity: only incident channel
             if let Some(channel_id) = &incident.slack_channel_id {
-                self.send_to_channel(incident.id, channel_id, &blocks).await?;
+                self.send_to_channel(incident.id, channel_id, &blocks)
+                    .await?;
             }
             Ok(())
         }
@@ -75,7 +82,8 @@ impl NotificationService {
         blocks: Vec<Value>,
     ) -> IncidentResult<()> {
         // Resolution notifications go to same channels as initial declaration
-        self.route_by_severity(incident, blocks, "incident_resolved").await
+        self.route_by_severity(incident, blocks, "incident_resolved")
+            .await
     }
 
     async fn route_by_severity(
@@ -88,12 +96,14 @@ impl NotificationService {
             Severity::P1 => {
                 // P1: incident channel + #general + DM execs
                 if let Some(channel_id) = &incident.slack_channel_id {
-                    self.send_to_channel(incident.id, channel_id, &blocks).await?;
+                    self.send_to_channel(incident.id, channel_id, &blocks)
+                        .await?;
                 }
 
                 // Post to all P1 channels
                 for channel_id in &self.config.p1_channels {
-                    self.send_to_channel(incident.id, channel_id, &blocks).await?;
+                    self.send_to_channel(incident.id, channel_id, &blocks)
+                        .await?;
                 }
 
                 // DM all P1 recipients
@@ -118,17 +128,20 @@ impl NotificationService {
             Severity::P2 => {
                 // P2: incident channel + #engineering
                 if let Some(channel_id) = &incident.slack_channel_id {
-                    self.send_to_channel(incident.id, channel_id, &blocks).await?;
+                    self.send_to_channel(incident.id, channel_id, &blocks)
+                        .await?;
                 }
 
                 for channel_id in &self.config.p2_channels {
-                    self.send_to_channel(incident.id, channel_id, &blocks).await?;
+                    self.send_to_channel(incident.id, channel_id, &blocks)
+                        .await?;
                 }
             }
             Severity::P3 | Severity::P4 => {
                 // P3/P4: incident channel only
                 if let Some(channel_id) = &incident.slack_channel_id {
-                    self.send_to_channel(incident.id, channel_id, &blocks).await?;
+                    self.send_to_channel(incident.id, channel_id, &blocks)
+                        .await?;
                 }
             }
         }
@@ -142,9 +155,8 @@ impl NotificationService {
         // Cleanup: Remove entries older than 10 minutes (2x throttle window)
         // This prevents unbounded memory growth
         let now = chrono::Utc::now();
-        throttle_map.retain(|_, last_sent| {
-            now.signed_duration_since(*last_sent).num_seconds() < 600
-        });
+        throttle_map
+            .retain(|_, last_sent| now.signed_duration_since(*last_sent).num_seconds() < 600);
 
         let key = (user_id.to_string(), incident_id);
 
@@ -169,7 +181,11 @@ impl NotificationService {
         blocks: &[Value],
     ) -> IncidentResult<()> {
         // Clone only when actually sending to reduce memory allocations
-        match self.slack_client.post_message(channel_id, blocks.to_vec()).await {
+        match self
+            .slack_client
+            .post_message(channel_id, blocks.to_vec())
+            .await
+        {
             Ok(_) => {
                 notifications::log_notification(
                     &self.pool,

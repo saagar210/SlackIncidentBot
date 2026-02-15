@@ -9,18 +9,13 @@ use tracing::{debug, info};
 pub fn generate_channel_name(service: &str, date: NaiveDate, incident_id: IncidentId) -> String {
     let slug = service
         .to_lowercase()
-        .replace(' ', "-")
-        .replace('_', "-")
+        .replace([' ', '_'], "-")
         .chars()
         .filter(|c| c.is_alphanumeric() || *c == '-')
         .collect::<String>();
 
     // Take first 40 chars of service slug to leave room for date + prefix
-    let slug_truncated = if slug.len() > 40 {
-        &slug[..40]
-    } else {
-        &slug
-    };
+    let slug_truncated = if slug.len() > 40 { &slug[..40] } else { &slug };
 
     let base = format!("inc-{}-{}", date.format("%Y%m%d"), slug_truncated);
 
@@ -49,9 +44,9 @@ pub async fn create_incident_channel(
             info!("Created channel #{} ({})", base_name, channel_id);
             Ok((channel_id, base_name))
         }
-        Err(IncidentError::SlackAPIError { slack_error_code, .. })
-            if slack_error_code == "name_taken" =>
-        {
+        Err(IncidentError::SlackAPIError {
+            slack_error_code, ..
+        }) if slack_error_code == "name_taken" => {
             // Channel already exists, add UUID suffix (8 chars = ~4B combinations, reduces collision risk)
             let uuid_suffix = &incident_id.to_string()[..8];
             let unique_name = format!("{}-{}", base_name, uuid_suffix);

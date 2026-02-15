@@ -20,10 +20,7 @@ pub async fn execute(
         .await
     {
         Ok(_) => {
-            info!(
-                "Successfully synced incident {} to Statuspage",
-                incident_id
-            );
+            info!("Successfully synced incident {} to Statuspage", incident_id);
             Ok(())
         }
         Err(e) => {

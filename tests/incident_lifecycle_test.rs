@@ -311,3 +311,43 @@ async fn test_full_incident_lifecycle() {
 
     ctx.cleanup().await;
 }
+
+#[tokio::test]
+async fn test_get_latest_by_channel_includes_resolved_incidents() {
+    let ctx = common::TestContext::new().await;
+    let incident_service = IncidentService::new(ctx.pool.clone());
+
+    let incident = incident_service
+        .create_incident(
+            "Resolved lookup test".to_string(),
+            Severity::P2,
+            "Test Service".to_string(),
+            "U024COMMANDER".to_string(),
+        )
+        .await
+        .expect("Failed to create incident");
+
+    incident_service
+        .update_channel_id(incident.id, "C024TESTCHANNEL".to_string())
+        .await
+        .expect("Failed to set channel id");
+
+    incident_service
+        .resolve_incident(incident.id, "U024COMMANDER".to_string())
+        .await
+        .expect("Failed to resolve incident");
+
+    let active_lookup = incident_service.get_by_channel("C024TESTCHANNEL").await;
+    assert!(matches!(
+        active_lookup,
+        Err(incident_bot::error::IncidentError::NotFound)
+    ));
+
+    let latest = incident_service
+        .get_latest_by_channel("C024TESTCHANNEL")
+        .await
+        .expect("Expected resolved incident to be retrievable");
+    assert!(latest.status.is_terminal());
+
+    ctx.cleanup().await;
+}

@@ -48,8 +48,9 @@ pub async fn handle_status(state: AppState, payload: SlashCommandPayload) -> Inc
     };
 
     // Validate commander
-    if let Err(IncidentError::PermissionDenied { .. }) =
-        incident_service.validate_commander(&incident, &payload.user_id).await
+    if let Err(IncidentError::PermissionDenied { .. }) = incident_service
+        .validate_commander(&incident, &payload.user_id)
+        .await
     {
         return state
             .slack_client
@@ -66,11 +67,8 @@ pub async fn handle_status(state: AppState, payload: SlashCommandPayload) -> Inc
         .await?;
 
     // Post to channel
-    let status_blocks = blocks::status_update_blocks(
-        updated_incident.severity,
-        message,
-        &payload.user_id,
-    );
+    let status_blocks =
+        blocks::status_update_blocks(updated_incident.severity, message, &payload.user_id);
 
     if let Some(_channel_id) = &updated_incident.slack_channel_id {
         let notification_service = NotificationService::new(
@@ -88,7 +86,12 @@ pub async fn handle_status(state: AppState, payload: SlashCommandPayload) -> Inc
     }
 
     // Enqueue Statuspage sync if component mapping exists
-    if let Ok(Some(component_id)) = crate::db::queries::statuspage::get_component_id(&state.pool, &updated_incident.affected_service).await {
+    if let Ok(Some(component_id)) = crate::db::queries::statuspage::get_component_id(
+        &state.pool,
+        &updated_incident.affected_service,
+    )
+    .await
+    {
         let job = crate::jobs::Job::StatuspageSync {
             incident_id: updated_incident.id,
             component_id,

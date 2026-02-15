@@ -9,14 +9,17 @@ use tracing::{error, info};
 pub async fn handle_resolved(state: AppState, payload: SlashCommandPayload) -> IncidentResult<()> {
     // Get incident from channel
     let incident_service = IncidentService::new(state.pool.clone());
-    let incident = match incident_service.get_by_channel(&payload.channel_id).await {
+    let incident = match incident_service
+        .get_latest_by_channel(&payload.channel_id)
+        .await
+    {
         Ok(inc) => inc,
         Err(IncidentError::NotFound) => {
             return state
                 .slack_client
                 .post_to_response_url(
                     &payload.response_url,
-                    blocks::error_blocks("No active incident in this channel"),
+                    blocks::error_blocks("No incident found in this channel"),
                 )
                 .await;
         }
@@ -24,8 +27,9 @@ pub async fn handle_resolved(state: AppState, payload: SlashCommandPayload) -> I
     };
 
     // Validate commander
-    if let Err(IncidentError::PermissionDenied { .. }) =
-        incident_service.validate_commander(&incident, &payload.user_id).await
+    if let Err(IncidentError::PermissionDenied { .. }) = incident_service
+        .validate_commander(&incident, &payload.user_id)
+        .await
     {
         return state
             .slack_client
@@ -77,7 +81,12 @@ pub async fn handle_resolved(state: AppState, payload: SlashCommandPayload) -> I
     }
 
     // Enqueue Statuspage sync if component mapping exists
-    if let Ok(Some(component_id)) = crate::db::queries::statuspage::get_component_id(&state.pool, &resolved_incident.affected_service).await {
+    if let Ok(Some(component_id)) = crate::db::queries::statuspage::get_component_id(
+        &state.pool,
+        &resolved_incident.affected_service,
+    )
+    .await
+    {
         let job = crate::jobs::Job::StatuspageSync {
             incident_id: resolved_incident.id,
             component_id,

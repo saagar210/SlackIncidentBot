@@ -59,8 +59,9 @@ pub async fn handle_severity(state: AppState, payload: SlashCommandPayload) -> I
     };
 
     // Validate commander
-    if let Err(IncidentError::PermissionDenied { .. }) =
-        incident_service.validate_commander(&incident, &payload.user_id).await
+    if let Err(IncidentError::PermissionDenied { .. }) = incident_service
+        .validate_commander(&incident, &payload.user_id)
+        .await
     {
         return state
             .slack_client
@@ -90,7 +91,12 @@ pub async fn handle_severity(state: AppState, payload: SlashCommandPayload) -> I
 
     // Change severity
     let (updated_incident, old_severity) = incident_service
-        .change_severity(incident.id, new_severity, payload.user_id.clone(), reason.clone())
+        .change_severity(
+            incident.id,
+            new_severity,
+            payload.user_id.clone(),
+            reason.clone(),
+        )
         .await?;
 
     // Post to channel
@@ -117,7 +123,12 @@ pub async fn handle_severity(state: AppState, payload: SlashCommandPayload) -> I
     }
 
     // Enqueue Statuspage sync if component mapping exists
-    if let Ok(Some(component_id)) = crate::db::queries::statuspage::get_component_id(&state.pool, &updated_incident.affected_service).await {
+    if let Ok(Some(component_id)) = crate::db::queries::statuspage::get_component_id(
+        &state.pool,
+        &updated_incident.affected_service,
+    )
+    .await
+    {
         let job = crate::jobs::Job::StatuspageSync {
             incident_id: updated_incident.id,
             component_id,

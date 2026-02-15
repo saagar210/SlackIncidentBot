@@ -5,7 +5,7 @@ use crate::slack::verification::verify_slack_signature;
 use axum::extract::State;
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::Value;
 use tracing::{debug, error, info};
 
@@ -25,7 +25,6 @@ struct InteractionPayload {
     pub interaction_type: String,
     pub user: User,
     pub view: Option<ViewPayload>,
-    pub trigger_id: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -59,7 +58,12 @@ pub async fn handle_slash_command(
         .and_then(|v| v.to_str().ok())
         .unwrap_or("");
 
-    if let Err(e) = verify_slack_signature(&state.config.slack_signing_secret, timestamp, &body, signature) {
+    if let Err(e) = verify_slack_signature(
+        &state.config.slack_signing_secret,
+        timestamp,
+        &body,
+        signature,
+    ) {
         error!("Signature verification failed: {}", e);
         return (StatusCode::UNAUTHORIZED, "Invalid signature").into_response();
     }
@@ -73,7 +77,10 @@ pub async fn handle_slash_command(
         }
     };
 
-    debug!("Received slash command: {} {}", payload.command, payload.text);
+    debug!(
+        "Received slash command: {} {}",
+        payload.command, payload.text
+    );
 
     // Spawn async task to process command
     let state_clone = state.clone();
@@ -88,11 +95,13 @@ pub async fn handle_slash_command(
                 user_id, command, channel_id, e
             );
             // Attempt to notify user via response_url
-            let error_blocks = crate::slack::blocks::error_blocks(&format!(
-                "Command failed: {}",
-                e
-            ));
-            if let Err(post_err) = state_clone.slack_client.post_to_response_url(&response_url, error_blocks).await {
+            let error_blocks =
+                crate::slack::blocks::error_blocks(&format!("Command failed: {}", e));
+            if let Err(post_err) = state_clone
+                .slack_client
+                .post_to_response_url(&response_url, error_blocks)
+                .await
+            {
                 error!("Failed to post error to response_url: {}", post_err);
             }
         }
@@ -104,7 +113,10 @@ pub async fn handle_slash_command(
     StatusCode::OK.into_response()
 }
 
-async fn process_slash_command(state: AppState, payload: SlashCommandPayload) -> IncidentResult<()> {
+async fn process_slash_command(
+    state: AppState,
+    payload: SlashCommandPayload,
+) -> IncidentResult<()> {
     let parts: Vec<&str> = payload.text.split_whitespace().collect();
     let subcommand = parts.first().copied().unwrap_or("");
 
@@ -132,7 +144,10 @@ async fn process_slash_command(state: AppState, payload: SlashCommandPayload) ->
                 "Unknown subcommand: {}. Available: declare, status, severity, resolved, timeline, postmortem",
                 subcommand
             ));
-            state.slack_client.post_to_response_url(&payload.response_url, blocks).await?;
+            state
+                .slack_client
+                .post_to_response_url(&payload.response_url, blocks)
+                .await?;
         }
     }
 
@@ -154,19 +169,25 @@ pub async fn handle_interaction(
         .and_then(|v| v.to_str().ok())
         .unwrap_or("");
 
-    if let Err(e) = verify_slack_signature(&state.config.slack_signing_secret, timestamp, &body, signature) {
+    if let Err(e) = verify_slack_signature(
+        &state.config.slack_signing_secret,
+        timestamp,
+        &body,
+        signature,
+    ) {
         error!("Signature verification failed: {}", e);
         return (StatusCode::UNAUTHORIZED, "Invalid signature").into_response();
     }
 
     // Parse URL-encoded payload
-    let form_data: std::collections::HashMap<String, String> = match serde_urlencoded::from_str(&body) {
-        Ok(d) => d,
-        Err(e) => {
-            error!("Failed to parse interaction: {}", e);
-            return (StatusCode::BAD_REQUEST, "Invalid request").into_response();
-        }
-    };
+    let form_data: std::collections::HashMap<String, String> =
+        match serde_urlencoded::from_str(&body) {
+            Ok(d) => d,
+            Err(e) => {
+                error!("Failed to parse interaction: {}", e);
+                return (StatusCode::BAD_REQUEST, "Invalid request").into_response();
+            }
+        };
 
     let payload_json = match form_data.get("payload") {
         Some(p) => p.clone(),
@@ -207,7 +228,8 @@ async fn process_interaction(state: AppState, payload: InteractionPayload) -> In
         "view_submission" => {
             if let Some(view) = payload.view {
                 if view.callback_id == "declare_incident_modal" {
-                    crate::commands::declare::handle_modal_submission(state, view, payload.user.id).await?;
+                    crate::commands::declare::handle_modal_submission(state, view, payload.user.id)
+                        .await?;
                 }
             }
         }
