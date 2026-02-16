@@ -2,7 +2,7 @@
 #  Makefile for Slack Incident Bot
 # ══════════════════════════════════════════════════════════
 
-.PHONY: help build run test clean docker-build docker-up docker-down migrate fmt lint check dev
+.PHONY: help build run test clean docker-build docker-up docker-down migrate fmt lint check dev lean-dev clean-heavy clean-full-local size-report
 
 # ── Default target ──
 help:
@@ -10,6 +10,7 @@ help:
 	@echo ""
 	@echo "Development:"
 	@echo "  make dev          - Run in development mode with auto-reload"
+	@echo "  make lean-dev     - Run with temporary build artifacts (auto-clean on exit)"
 	@echo "  make run          - Build and run the application"
 	@echo "  make check        - Check compilation without building"
 	@echo "  make test         - Run all tests"
@@ -32,6 +33,9 @@ help:
 	@echo "  make build        - Build release binary"
 	@echo "  make build-dev    - Build debug binary"
 	@echo "  make clean        - Clean build artifacts"
+	@echo "  make clean-heavy  - Remove heavy build artifacts only"
+	@echo "  make clean-full-local - Remove all reproducible local caches/artifacts"
+	@echo "  make size-report  - Show disk usage for common heavy paths"
 	@echo ""
 
 # ── Build ──
@@ -48,6 +52,9 @@ run: build
 dev:
 	@command -v cargo-watch >/dev/null 2>&1 || (echo "Installing cargo-watch..." && cargo install cargo-watch)
 	cargo watch -x run
+
+lean-dev:
+	./scripts/lean-dev.sh
 
 # ── Check & Test ──
 check:
@@ -109,6 +116,22 @@ docker-restart:
 clean:
 	cargo clean
 	rm -rf target/
+
+clean-heavy:
+	./scripts/clean-heavy.sh
+
+clean-full-local:
+	./scripts/clean-full-local.sh
+
+size-report:
+	@echo "Disk usage snapshot:"
+	@for path in target .sqlx "$${TMPDIR:-/tmp}/incident-bot-lean"; do \
+		if [ -e "$$path" ]; then \
+			du -sh "$$path"; \
+		else \
+			echo "$$path (missing)"; \
+		fi; \
+	done
 
 # ── CI ──
 ci: fmt-check lint test
