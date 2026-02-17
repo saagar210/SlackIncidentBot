@@ -205,6 +205,12 @@ See `migrations/20260215000001_initial_schema.sql` for full schema.
 ## Development
 
 ```bash
+# Normal dev run (persists build artifacts in ./target)
+make run
+
+# Lean dev run (temporary build artifacts, auto-removed on exit)
+make lean-dev
+
 # Run tests
 cargo test
 
@@ -221,7 +227,26 @@ cargo watch -x run
 # Database migrations
 sqlx migrate add <name>
 sqlx migrate run
+
+# Cleanup only heavy build artifacts
+make clean-heavy
+
+# Cleanup all reproducible local artifacts/caches
+make clean-full-local
+
+# Inspect common heavy paths
+make size-report
 ```
+
+### Normal dev vs lean dev
+
+- `make run`: fastest repeat startup because Rust build artifacts remain in `target/`, but disk usage grows.
+- `make lean-dev`: uses a temporary `CARGO_TARGET_DIR` under `${TMPDIR:-/tmp}/incident-bot-lean`, keeps dependency caches in `~/.cargo`, and automatically deletes the temporary build artifacts when the process exits.
+- `make clean-heavy`: removes only heavy local build artifacts (`target/` and lean temp directories).
+- `make clean-full-local`: removes all reproducible project-local artifacts (`target/`, `.sqlx`, and lean temp directories) and runs `cargo clean`.
+- Script equivalents:
+  - `./scripts/clean-heavy.sh`
+  - `./scripts/clean-full-local.sh`
 
 ## Deployment
 
